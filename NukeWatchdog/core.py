@@ -1,8 +1,34 @@
+import multiprocessing
 import os
+import Queue
+import random
 import re
 import subprocess
 import threading
 import time
+
+# Instantiate the job queue
+# job_queue = Queue.Queue()
+
+
+class ActivePool(object):
+    def __init__(self):
+        super(ActivePool, self).__init__()
+        self.manager = multiprocessing.Manager()
+        self.active = self.manager.list()
+        self.lock = multiprocessing.Lock()
+
+    def makeActive(self, name):
+        with self.lock:
+            self.active.append(name)
+
+    def makeInactive(self, name):
+        with self.lock:
+            self.active.remove(name)
+
+    def __str__(self):
+        with self.lock:
+            return str(self.active)
 
 
 # Nuke and subprocess communicate aren't buddies.
@@ -23,7 +49,7 @@ def progress(proc):
             print '[PROGRESS] %s' % line
 
 
-def watchdog(watch_path):
+def watch_directory(watch_path):
     before = dict([(f, None) for f in os.listdir(watch_path)])
     while 1:
         time.sleep(10)
@@ -39,6 +65,12 @@ def watchdog(watch_path):
         before = after
 
 
+def render_worker(s, args):
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    threading.Thread(target=lambda: progress(proc), name='printer').start()
+    return proc
+
+
 def renderRegex():
     args = [
         "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
@@ -51,13 +83,36 @@ def renderRegex():
         "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
     ]
 
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-    threading.Thread(target=lambda: progress(proc), name='printer').start()
+    # proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    # threading.Thread(target=lambda: progress(proc), name='printer').start()
+    job_queue.put(render_worker(args))
 
+
+def worker(s, pool):
+    name = multiprocessing.current_process().name
+    with s:
+        pool.makeActive(name)
+        print 'Starting: %s' % str(pool)
+        time.sleep(random.random())
+        pool.makeInactive(name)
 
 if __name__ == "__main__":
-    print 'hello world'
-    input_path = "/Users/ianhartman/Desktop/watchfolder"
-    # watchdog(input_path)
-    renderRegex()
+    # input_path = "/Users/ianhartman/Desktop/watchfolder"
+    # watch_directory(input_path)
+    # renderRegex()
+
+    pool = ActivePool()
+    s = multiprocessing.Semaphore(2)
+    jobs = [
+        multiprocessing.Process(target=worker, name=str(i), args=(s, pool))
+        for i in range(10)
+    ]
+
+    for j in jobs:
+        j.start()
+
+    for j in jobs:
+        j.join()
+        print 'Now running: %s' % str(pool)
+
 
