@@ -1,90 +1,89 @@
-#
-# Simple example which uses a pool of workers to carry out some tasks.
-#
-# Notice that the results will probably not come out of the output
-# queue in the same in the same order as the corresponding tasks were
-# put on the input queue.  If it is important to get the results back
-# in the original order then consider using `Pool.map()` or
-# `Pool.imap()` (which will save on the amount of code needed anyway).
-#
-# Copyright (c) 2006-2008, R Oudkerk
-# All rights reserved.
-#
-
+import multiprocessing
+import os
+import subprocess
+import re
 import time
-import random
-
-from multiprocessing import Process, Queue, current_process, freeze_support
 
 
-#
-# Function run by worker processes
-#
-
-def worker(input, output):
-    for func, args in iter(input.get, 'STOP'):
-        result = calculate(func, args)
-        output.put(result)
-
-
-#
-# Function used to calculate result
-#
-
-def calculate(func, args):
-    result = func(*args)
-    return '%s says that %s%s = %s' % (current_process().name, func.__name__, args, result)
+def worker_main(queue):
+    print 'PID [%s] - Started' % os.getpid()
+    while True:
+        item = queue.get(True)
+        process = subprocess.Popen(item, stdout=subprocess.PIPE)
+        progress(process)
+        # print 'PID [%s] - GET - %s' % (os.getpid(), item)
 
 
-#
-# Functions referenced by tasks
-#
+# Nuke and subprocess communicate aren't buddies.
+def progress(proc):
+    """
+    Prints the progress of the thread.
 
-def mul(a, b):
-    time.sleep(0.2)
-    return a * b
-
-
-def plus(a, b):
-    time.sleep(0.2)
-    return a + b
-
-
-#
-#
-#
-
-def run():
-    NUMBER_OF_PROCESSES = 3
-    TASKS1 = [(mul, (i, 7)) for i in range(20)]
-    TASKS2 = [(plus, (i, 8)) for i in range(10)]
-
-    # Create queues
-    task_queue = Queue()
-    done_queue = Queue()
-
-    # Submit tasks
-    for task in TASKS1:
-        task_queue.put(task)
-
-    # Start worker processes
-    for i in range(NUMBER_OF_PROCESSES):
-        Process(target=worker, args=(task_queue, done_queue)).start()
-
-    # Add more tasks using `put()`
-    for task in TASKS2:
-        task_queue.put(task)
-
-    # Get and print results
-    print 'Unordered results:'
-    for i in range(task_queue.qsize()):
-        print '\t', done_queue.get()
-
-    # Tell child processes to stop
-    for i in range(NUMBER_OF_PROCESSES):
-        task_queue.put('STOP')
+    :param proc: Input process to print the progress of.
+    :return: None
+    """
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        if re.match(r"Frame\s+", line):
+            cur_process = multiprocessing.current_process()
+            print cur_process.name
+            print '[PROGRESS] %s' % line
 
 
 if __name__ == '__main__':
-    freeze_support()
-    run()
+    NUMBER_OF_PROCESSES = 2
+    the_queue = multiprocessing.Queue()
+    the_pool = multiprocessing.Pool(NUMBER_OF_PROCESSES, worker_main, (the_queue, ))
+
+    # for i in range(NUMBER_OF_PROCESSES):
+    #     multiprocessing.Process(target=worker_main, args=(the_queue,)).start()
+
+    tasks = [[
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "1-10",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ], [
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "21-30",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ]]
+    for task in tasks:
+        the_queue.put(task)
+
+    time.sleep(2)
+    new_tasks = [[
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "41-50",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ], [
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "61-70",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ]]
+    for newtask in new_tasks:
+        the_queue.put(newtask)
+
+    the_pool.close()
+    the_pool.join()

@@ -12,9 +12,10 @@
 #
 
 import time
-import random
-
+import re
 from multiprocessing import Process, Queue, current_process, freeze_support
+import subprocess
+import threading
 
 
 #
@@ -23,43 +24,52 @@ from multiprocessing import Process, Queue, current_process, freeze_support
 
 def worker(input, output):
     for func, args in iter(input.get, 'STOP'):
-        result = calculate(func, args)
-        time.sleep(1)
-        output.put(result)
+        process = subprocess.Popen(input.get(), stdout=subprocess.PIPE)
+        threading.Thread(target=lambda: progress(process), name='printer').start()
+        # time.sleep(1)
+        output.put('done')
 
 
-#
-# Function used to calculate result
-#
+# Nuke and subprocess communicate aren't buddies.
+def progress(proc):
+    """
+    Prints the progress of the thread.
 
-def calculate(func, args):
-    result = func(*args)
-    return '%s says that %s%s = %s' % \
-        (current_process().name, func.__name__, args, result)
+    :param proc: Input process to print the progress of.
+    :return: None
+    """
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        if re.match(r"Frame\s+", line):
+            cur_process = threading.current_thread()
+            print cur_process.name
+            print '[PROGRESS] %s' % line
 
-
-#
-# Functions referenced by tasks
-#
-
-def mul(a, b):
-    time.sleep(0.5*random.random())
-    return a * b
-
-
-def plus(a, b):
-    time.sleep(0.5*random.random())
-    return a + b
-
-
-#
-#
-#
 
 def run():
-    NUMBER_OF_PROCESSES = 10
-    TASKS1 = [(mul, (i, 7)) for i in range(20)]
-    TASKS2 = [(plus, (i, 8)) for i in range(10)]
+    NUMBER_OF_PROCESSES = 2
+    TASKS1 = [[
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "1-10",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ]]
+    TASKS2 = [[
+        "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
+        "--nukex",
+        "-i",
+        "-F",
+        "21-30",
+        "-X",
+        "Write1",
+        "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
+    ]]
 
     # Create queues
     task_queue = Queue()
@@ -73,22 +83,17 @@ def run():
     for i in range(NUMBER_OF_PROCESSES):
         Process(target=worker, args=(task_queue, done_queue)).start()
 
-    # Get and print results
-    print 'Unordered results:'
-    for i in range(len(TASKS1)):
-        print '\t', done_queue.get()
-
     # Add more tasks using `put()`
     for task in TASKS2:
         task_queue.put(task)
 
-    # Get and print some more results
-    for i in range(len(TASKS2)):
-        print '\t', done_queue.get()
-
-    # Tell child processes to stop
-    for i in range(NUMBER_OF_PROCESSES):
-        task_queue.put('STOP')
+    # # Get and print some more results
+    # for i in range(task_queue.qsize()):
+    #     print '\t', done_queue.get()
+    #
+    # # Tell child processes to stop
+    # for i in range(NUMBER_OF_PROCESSES):
+    #     task_queue.put('STOP')
 
 
 if __name__ == '__main__':

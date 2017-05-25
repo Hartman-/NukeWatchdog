@@ -83,36 +83,22 @@ def renderRegex():
         "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
     ]
 
-    # proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-    # threading.Thread(target=lambda: progress(proc), name='printer').start()
-    job_queue.put(render_worker(args))
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    threading.Thread(target=lambda: progress(proc), name='printer').start()
+    # job_queue.put(render_worker(args))
 
 
 def worker(s, pool):
     name = multiprocessing.current_process().name
     with s:
         pool.makeActive(name)
-        print 'Starting: %s' % str(pool)
         time.sleep(random.random())
         pool.makeInactive(name)
 
 if __name__ == "__main__":
     # input_path = "/Users/ianhartman/Desktop/watchfolder"
     # watch_directory(input_path)
-    # renderRegex()
+    renderRegex()
 
-    pool = ActivePool()
-    s = multiprocessing.Semaphore(2)
-    jobs = [
-        multiprocessing.Process(target=worker, name=str(i), args=(s, pool))
-        for i in range(10)
-    ]
-
-    for j in jobs:
-        j.start()
-
-    for j in jobs:
-        j.join()
-        print 'Now running: %s' % str(pool)
 
 
