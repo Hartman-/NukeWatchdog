@@ -10,6 +10,8 @@ import psutil
 POOL_RUNNING = False
 
 
+# Maintains a list of the jobs active in the queue
+# Allows for easy updating of active/idling jobs
 class ActivePool(object):
     def __init__(self):
         super(ActivePool, self).__init__()
@@ -121,9 +123,6 @@ if __name__ == '__main__':
     queue_watcher.setDaemon(True)
     queue_watcher.start()
 
-    # for i in range(NUMBER_OF_PROCESSES):
-    #     multiprocessing.Process(target=worker_main, args=(the_queue,)).start()
-
     tasks = [[
         "NUKE_JOB_0",
         "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
@@ -158,29 +157,6 @@ if __name__ == '__main__':
     for task in tasks:
         the_queue.put(task)
 
-    # time.sleep(2)
-    # new_tasks = [[
-    #     "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
-    #     "--nukex",
-    #     "-i",
-    #     "-F",
-    #     "41-50",
-    #     "-X",
-    #     "Write1",
-    #     "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
-    # ], [
-    #     "/Applications/Nuke10.5v4/Nuke10.5v4.app/Contents/MacOS/Nuke10.5v4",
-    #     "--nukex",
-    #     "-i",
-    #     "-F",
-    #     "61-70",
-    #     "-X",
-    #     "Write1",
-    #     "/Users/ianhartman/Desktop/footage_tracking/_source/track_v001.nk"
-    # ]]
-    # for newtask in new_tasks:
-    #     the_queue.put(newtask)
-
-
+    # Effectively close the pool
     the_pool.close()
     the_pool.join()
