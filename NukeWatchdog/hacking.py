@@ -33,6 +33,7 @@ class ActivePool(object):
 
 
 # Simple multiprocessing process work submit function
+# TODO: Enable setting of custom env variables that are read back on the queue list (seq/shot/submittor ID/frame range/etc)
 def worker_main(queue, pool):
     print 'PID [%s] - Started' % os.getpid()
 
@@ -54,7 +55,8 @@ def worker_main(queue, pool):
         # print 'PID [%s] - GET - %s' % (os.getpid(), item)
 
 
-# Nuke and subprocess communicate aren't buddies.
+# Nuke and subprocess communicate aren't buddies, quick printer to check the progress
+# TODO: Hook this process into a watcher that contains the progress for all tasks. Maybe roll into ActiveQueue?
 def progress(proc):
     """
     Prints the progress of the thread.
@@ -111,13 +113,17 @@ def checkQueue(in_queue, num, pool):
 if __name__ == '__main__':
     active_pool = ActivePool()
 
+    # TODO: Hard coded value, want to move to a slider that the user can adjust up/down
     NUMBER_OF_PROCESSES = 2
     the_queue = multiprocessing.Queue()
-    the_pool = multiprocessing.Pool(NUMBER_OF_PROCESSES, worker_main, (the_queue, active_pool, ))
+    the_pool = multiprocessing.Pool(NUMBER_OF_PROCESSES, worker_main, (the_queue,
+                                                                       active_pool, ))
+
+    # TODO: find a better way to implement a watch on whether or not the pool is running and to quit
     POOL_RUNNING = True
 
     # Setup thread to constantly check the queue for tasks
-    queue_watcher = threading.Thread(target=checkQueue, name='QueueWatch', args=(the_queue,
+    queue_watcher = threading.Thread(target=checkQueue, name='QueueWatcher', args=(the_queue,
                                                                                  NUMBER_OF_PROCESSES,
                                                                                  active_pool))
     queue_watcher.setDaemon(True)
