@@ -2,11 +2,9 @@ import multiprocessing
 import os
 import subprocess
 import re
-import sys
 import time
 import threading
 import psutil
-
 
 POOL_RUNNING = False
 
@@ -120,6 +118,18 @@ def poolRunning():
     return POOL_RUNNING
 
 
+def dump_queue(queue):
+    """
+    Empties all pending items in a queue and returns them in a list.
+    """
+    result = []
+
+    for i in iter(queue.get, 'STOP'):
+        result.append(i)
+    time.sleep(.1)
+    return result
+
+
 # Thread target to check the queue on a constant interval
 # Adds idle sleep process if the queue is empty
 def checkQueue(in_queue, num, pool):
@@ -179,12 +189,23 @@ class Supervisor(object):
 
         self.startWatcher(self.queue, self.processes, self.pool)
 
+        # Close the pool
+        self.pool.close()
+        self.pool.join()
+
     def startWatcher(self, queue, processes, pool):
         queue_watcher = threading.Thread(target=checkQueue, name='QueueWatcher', args=(queue,
                                                                                        processes,
                                                                                        pool))
         queue_watcher.setDaemon(True)
         queue_watcher.start()
+
+    def currentQueue(self):
+        queue_list = dump_queue(self.queue)
+        print queue_list
+
+    def addTask(self, input_task):
+        self.queue.put(input_task)
 
     def addTasks(self):
         tasks = [{
@@ -238,7 +259,7 @@ class Supervisor(object):
         }]
 
         for task in tasks:
-            self.queue.put(task)
+            self.addTask(task)
 
 if __name__ == "__main__":
     processes = 2
