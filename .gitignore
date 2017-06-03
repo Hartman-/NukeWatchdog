@@ -37,3 +37,6 @@ nosetests.xml
 
 #Pycharm
 .idea
+
+#virtual environment
+venv
